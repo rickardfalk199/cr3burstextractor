@@ -55,21 +55,25 @@ public static class FrameBuilder
         // the CTBO table inside moov is re-pointed to their new positions and to the
         // new (single-frame) mdat.
 
-        // ---------- 3. Clone moov with per-frame sample tables ----------
+        // Find this frame's JPEG sample. Used to rebuild BOTH the in-moov THMB
+        // thumbnail AND the top-level PRVW preview per-frame; without it, every
+        // extracted file would inherit frame 0's preview and Lightroom would show
+        // the wrong image briefly before switching to the correct one.
+        byte[]? frameJpeg = PrvwBuilder.FindJpegSample(frameSamples);
+
+        // ---------- 3. Clone moov with per-frame sample tables + per-frame THMB
         byte[] patchedMoov = MoovBuilder.BuildPatched(
             src,
             moovBox,
             frameSamples,
             frameIdx,
+            frameJpeg,
             out long moovSize);
 
         // Grab verbatim bytes of every top-level uuid box.
         var uuidBytes = topUuids.Select(u => BoxQuery.GetRawBox(src, u)).ToList();
 
         // Replace the roll-level PRVW preview with one wrapping this frame's JPEG.
-        // Without this, every extracted file inherits frame 0's preview and they all
-        // look identical in file browsers / thumbnail viewers.
-        byte[]? frameJpeg = PrvwBuilder.FindJpegSample(frameSamples);
         if (frameJpeg != null)
         {
             for (int i = 0; i < topUuids.Count; i++)
