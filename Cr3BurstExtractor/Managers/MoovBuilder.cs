@@ -20,6 +20,7 @@ public static class MoovBuilder
         Box moovBox,
         List<(byte[] Data, int TrakIdx)> frameSamples,
         int frameIdx,
+        byte[]? frameJpeg,
         out long moovSize)
     {
         using var ms = new MemoryStream();
@@ -78,9 +79,16 @@ public static class MoovBuilder
                 // Patch movie duration down to a single frame
                 content.Write(BoxPatcher.PatchDuration(BoxQuery.GetRawBox(src, child), DurField.Mvhd, movieDur));
             }
+            else if (child.Type == "THMB" && frameJpeg != null)
+            {
+                // Replace the roll-level thumbnail with this frame's JPEG so
+                // Lightroom and Explorer don't show frame 0's thumbnail before
+                // switching to the correct PRVW preview.
+                content.Write(ThmbBuilder.BuildWithJpeg(BoxQuery.GetRawBox(src, child), frameJpeg));
+            }
             else
             {
-                // Copy the box verbatim (CMT1, CMT2, CMT3, CMT4, THMB, CNCV, uuid, etc.)
+                // Copy the box verbatim (CMT1, CMT2, CMT3, CMT4, CNCV, uuid, etc.)
                 content.Write(BoxQuery.GetRawBox(src, child));
             }
         }
