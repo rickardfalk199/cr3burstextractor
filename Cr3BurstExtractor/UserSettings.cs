@@ -27,6 +27,10 @@ internal static class UserSettings
         public string? ScanFolder { get; set; }
 
         public string? BackupFolder { get; set; }
+
+        // Default true preserves prior behaviour (move originals away after extraction)
+        // for users upgrading from a build without this flag.
+        public bool MoveOriginalsToBackup { get; set; } = true;
     }
 
     static readonly Data _data = Load();
@@ -84,5 +88,11 @@ internal static class UserSettings
     {
         get => _data.BackupFolder;
         set => _data.BackupFolder = value;
+    }
+
+    public static bool MoveOriginalsToBackup
+    {
+        get => _data.MoveOriginalsToBackup;
+        set => _data.MoveOriginalsToBackup = value;
     }
 }

@@ -42,6 +42,7 @@ public sealed class MainForm : Form
     readonly Button _scanBrowse;
     readonly Button _backupBrowse;
     readonly Button _extractButton;
+    readonly CheckBox _moveOriginalsCheckbox;
     readonly ProgressBar _progressBar;
     readonly Label _progressLabel;
     readonly Label _burstStatusLabel;
@@ -135,16 +136,20 @@ public sealed class MainForm : Form
         y += InputHeight + SectionGap;
 
         // ---- Backup folder section --------------------------------------
-        var backupLabel = new Label
+        // Section header is itself the on/off toggle: when unchecked the
+        // textbox + browse below grey out and originals stay where they are.
+        _moveOriginalsCheckbox = new CheckBox
         {
-            Text = "Backup folder",
+            Text = "Move originals to backup folder",
             Font = sectionFont,
             ForeColor = SectionHeader,
             AutoSize = true,
             Left = leftEdge,
-            Top = y
+            Top = y,
+            Checked = UserSettings.MoveOriginalsToBackup
         };
-        y += backupLabel.PreferredHeight + LabelToInputGap;
+        _moveOriginalsCheckbox.CheckedChanged += (_, _) => UpdateBackupControlsEnabled();
+        y += _moveOriginalsCheckbox.PreferredSize.Height + LabelToInputGap;
 
         _backupDirBox = new TextBox
         {
@@ -267,19 +272,35 @@ public sealed class MainForm : Form
 
         content.Controls.AddRange(new Control[]
         {
-            scanLabel,   _scanDirBox,   _scanBrowse,
-            backupLabel, _backupDirBox, _backupBrowse,
+            scanLabel,             _scanDirBox,   _scanBrowse,
+            _moveOriginalsCheckbox, _backupDirBox, _backupBrowse,
             _progressBar, _progressLabel, _extractButton,
             _burstStatusLabel,
             logLabel, _logBox
         });
 
+        UpdateBackupControlsEnabled();
+
         FormClosing += (_, _) =>
         {
             UserSettings.ScanFolder = _scanDirBox.Text;
             UserSettings.BackupFolder = _backupDirBox.Text;
+            UserSettings.MoveOriginalsToBackup = _moveOriginalsCheckbox.Checked;
             UserSettings.Save();
         };
+    }
+
+    /// <summary>
+    /// Greys out the backup folder textbox + Browse button when the user has
+    /// chosen to leave originals in place. Also called by <see cref="SetBusy"/>
+    /// so extraction-time enable state respects both the running flag and the
+    /// checkbox.
+    /// </summary>
+    void UpdateBackupControlsEnabled()
+    {
+        bool moveEnabled = _moveOriginalsCheckbox.Checked;
+        _backupDirBox.Enabled = moveEnabled && !_running;
+        _backupBrowse.Enabled = moveEnabled && !_running;
     }
 
     MenuStrip BuildMenu()
@@ -347,6 +368,7 @@ public sealed class MainForm : Form
 
         string scanDir = _scanDirBox.Text.Trim();
         string backupDir = _backupDirBox.Text.Trim();
+        bool moveOriginals = _moveOriginalsCheckbox.Checked;
 
         if (string.IsNullOrEmpty(scanDir) || !Directory.Exists(scanDir))
         {
@@ -354,9 +376,11 @@ public sealed class MainForm : Form
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        if (string.IsNullOrEmpty(backupDir))
+        if (moveOriginals && string.IsNullOrEmpty(backupDir))
         {
-            MessageBox.Show(this, "Select a backup folder.", "Missing backup folder",
+            MessageBox.Show(this,
+                "Select a backup folder, or uncheck \"Move originals to backup folder\" to leave them in place.",
+                "Missing backup folder",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -392,9 +416,9 @@ public sealed class MainForm : Form
 
         try
         {
-            Directory.CreateDirectory(backupDir);
+            if (moveOriginals) Directory.CreateDirectory(backupDir);
             var token = _cts.Token;
-            await Task.Run(() => ProcessDirectory(scanDir, backupDir, token, progress));
+            await Task.Run(() => ProcessDirectory(scanDir, backupDir, moveOriginals, token, progress));
         }
         catch (Exception ex)
         {
@@ -412,15 +436,21 @@ public sealed class MainForm : Form
         }
     }
 
-    static void ProcessDirectory(string scanDir, string backupDir, CancellationToken token,
+    static void ProcessDirectory(string scanDir, string backupDir, bool moveOriginals,
+                                  CancellationToken token,
                                   IProgress<(int processed, int total, int burstsFound, int framesExtracted)> progress)
     {
-        string fullBackup = Path.GetFullPath(backupDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // When moving originals, exclude anything already inside the backup folder
+        // so a re-run doesn't reprocess previously archived rolls. When NOT moving,
+        // backupDir may be empty and there's nothing to exclude.
+        string? fullBackup = moveOriginals && !string.IsNullOrEmpty(backupDir)
+            ? Path.GetFullPath(backupDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            : null;
 
         Console.WriteLine($"Counting .CR3 files under {scanDir} ...");
 
         var files = Directory.EnumerateFiles(scanDir, "*.CR3", SearchOption.AllDirectories)
-            .Where(f => !IsUnder(f, fullBackup))
+            .Where(f => fullBackup == null || !IsUnder(f, fullBackup))
             .ToList();
 
         int total = files.Count;
@@ -475,9 +505,16 @@ public sealed class MainForm : Form
                 int written = BurstExtractor.Extract(file, outDir);
                 framesExtracted += written;
 
-                string destBackup = UniquePath(Path.Combine(backupDir, Path.GetFileName(file)));
-                File.Move(file, destBackup);
-                Console.WriteLine($"  moved original -> {destBackup}");
+                if (moveOriginals)
+                {
+                    string destBackup = UniquePath(Path.Combine(backupDir, Path.GetFileName(file)));
+                    File.Move(file, destBackup);
+                    Console.WriteLine($"  moved original -> {destBackup}");
+                }
+                else
+                {
+                    Console.WriteLine($"  original left in place: {file}");
+                }
                 Console.WriteLine();
 
                 extracted++;
@@ -527,9 +564,9 @@ public sealed class MainForm : Form
         _extractButton.Text = busy ? "Stop" : "Extract";
         _extractButton.Enabled = true;
         _scanBrowse.Enabled = !busy;
-        _backupBrowse.Enabled = !busy;
         _scanDirBox.Enabled = !busy;
-        _backupDirBox.Enabled = !busy;
+        _moveOriginalsCheckbox.Enabled = !busy;
+        UpdateBackupControlsEnabled(); // respects both _running and the checkbox state
         UseWaitCursor = busy;
     }
 

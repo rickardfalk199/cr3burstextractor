@@ -92,7 +92,8 @@ On first launch the application shows a splash screen with the logo, version, au
 | Field | Meaning |
 | --- | --- |
 | **Scan folder** | The folder to search recursively for `.CR3` files. |
-| **Backup folder** | Original burst files are **moved** here after a successful extraction. |
+| **Move originals to backup folder** (checkbox) | When **ticked**, original burst files are moved into the Backup folder after a successful extraction. When **unticked**, the burst file is left in its original directory, next to the sub-folder containing its extracted frames. |
+| **Backup folder** | Only used when the checkbox above is ticked. Disabled (greyed out) otherwise. |
 | **Extract / Stop** | Click to start. While a run is in progress the button becomes **Stop** — pressing it halts the run **after the current file finishes** (no half-converted files left behind). |
 | **Progress bar** | Shows files processed / total files found. |
 | **Log box** | Per-file progress, including skipped files, the destination of each extraction, and error messages. |
@@ -111,7 +112,7 @@ D:\Photos\Wedding\CSI_0001.CR3   (burst, 12 frames)
 D:\Photos\Wedding\IMG_0008.CR3   (single frame)
 ```
 
-after running with `Scan = D:\Photos\Wedding` and `Backup = D:\Photos\_burst_originals`, the tree becomes:
+**With** the "Move originals to backup folder" checkbox **ticked**, running with `Scan = D:\Photos\Wedding` and `Backup = D:\Photos\_burst_originals` produces:
 
 ```
 D:\Photos\Wedding\
@@ -127,6 +128,19 @@ D:\Photos\_burst_originals\
 ```
 
 If a name collision would occur in the backup folder, the moved file gets a `_1`, `_2`, ... suffix.
+
+**With** the checkbox **unticked**, the same scan produces (no backup folder used):
+
+```
+D:\Photos\Wedding\
+    CSI_0001.CR3                   (the original — left in place)
+    CSI_0001\
+        CSI_0001_01.CR3
+        CSI_0001_02.CR3
+        ...
+        CSI_0001_12.CR3
+    IMG_0008.CR3                   (skipped, untouched)
+```
 
 ---
 

@@ -64,7 +64,9 @@ public sealed class HelpForm : Form
             textWidth,
             "How to use",
             "Pick a Scan folder. The application searches it recursively for .CR3 files.",
-            "Pick a Backup folder. Original burst files are moved here after a successful extraction.",
+            "Decide what to do with the original burst file after extraction:" +
+            "  •  Tick \"Move originals to backup folder\" and pick a backup folder — each burst will be moved there after its frames are written." +
+            "  •  Leave it unchecked to keep the burst file in its original directory next to the new sub-folder of frames.",
             "Click Extract.");
 
         AddSection(
@@ -80,7 +82,8 @@ public sealed class HelpForm : Form
             "What happens to each .CR3",
             "More than one frame (a burst roll): each frame is written into a new sub-folder placed " +
             "next to the original file, named after the original file (without extension). After " +
-            "the frames are written, the original burst file is moved to the Backup folder.",
+            "the frames are written, the original burst file is either moved to the Backup folder " +
+            "(if \"Move originals to backup folder\" is ticked) or left in its original directory.",
             "Only one frame: skipped — not a burst — the file is left untouched.",
             "Unreadable or invalid: logged as an error; the scan continues with the next file.");
 
@@ -88,8 +91,11 @@ public sealed class HelpForm : Form
             content,
             textWidth,
             "Notes",
-            "Files already inside the Backup folder are ignored by the scan, so re-runs don't " +
-            "re-process previously archived bursts.",
+            "When moving originals is enabled, files already inside the Backup folder are ignored " +
+            "by the scan, so re-runs don't re-process previously archived bursts.",
+            "When leaving originals in place, a second scan over the same folder will re-detect each " +
+            "burst as a burst again — but the extracted single-frame .CR3 files in their sub-folders " +
+            "are cached as non-burst, so they will not be re-opened.",
             "Extracted single-frame .CR3 files are fully valid standalone files; opening them in " +
             "your RAW developer should just work.",
             "All progress and per-file logging appears in the box at the bottom of the main window.");
