@@ -5,9 +5,9 @@ return {
     LrToolkitIdentifier = 'com.rickardfalk.cr3burstextractor',
     LrPluginName = 'CR3 Burst Extractor',
 
-    LrLibraryMenuItems = {
+    LrExportMenuItems = {
         {
-            title = 'Extract Burst Frames',
+            title = 'Extract Burst Frames…',
             file = 'ExtractBurstFrames.lua',
         },
     },

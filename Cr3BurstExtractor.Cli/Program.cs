@@ -1,3 +1,4 @@
+using Cr3BurstExtractor;
 using Cr3BurstExtractor.Managers;
 
 namespace Cr3BurstExtractor.Cli;
@@ -5,12 +6,26 @@ namespace Cr3BurstExtractor.Cli;
 internal static class Program
 {
     private const int ExitOk = 0;
+    private const int ExitFailure = 1;
+    private const int ExitSkipped = 2;
     private const int ExitUsage = 64;
     private const int ExitNotFound = 66;
-    private const int ExitFailure = 1;
 
     private static int Main(string[] args)
     {
+        // Settings shared with the WinForms tool (%APPDATA%\Cr3BurstExtractor\settings.json).
+        if (args.Length == 1 && args[0] == "--get-scan-folder")
+        {
+            Console.WriteLine(UserSettings.ScanFolder ?? string.Empty);
+            return ExitOk;
+        }
+        if (args.Length == 2 && args[0] == "--set-scan-folder")
+        {
+            UserSettings.ScanFolder = string.IsNullOrWhiteSpace(args[1]) ? null : args[1];
+            UserSettings.Save();
+            return ExitOk;
+        }
+
         bool countOnly = false;
         var positional = new List<string>(args.Length);
         foreach (var arg in args)
@@ -42,11 +57,30 @@ internal static class Program
                 return ExitOk;
             }
 
+            var info = new FileInfo(input);
+            if (NonBurstCache.IsKnownNonBurst(input, info))
+            {
+                Console.WriteLine("SKIPPED cached");
+                return ExitSkipped;
+            }
+
+            int frameCount = BurstExtractor.GetFrameCount(input);
+            if (frameCount <= 1)
+            {
+                NonBurstCache.MarkNonBurst(input, info);
+                NonBurstCache.Save();
+                Console.WriteLine("SKIPPED non-burst");
+                return ExitSkipped;
+            }
+
             string outputDir = positional.Count == 2
                 ? positional[1]
                 : Path.GetDirectoryName(Path.GetFullPath(input)) ?? Directory.GetCurrentDirectory();
 
             int written = BurstExtractor.Extract(input, outputDir);
+            // Extract() pre-seeds each output frame as non-burst in the in-memory
+            // cache; persist those marks so subsequent runs skip them.
+            NonBurstCache.Save();
             Console.WriteLine($"EXTRACTED {written}");
             return ExitOk;
         }
@@ -64,8 +98,14 @@ internal static class Program
         w.WriteLine("Usage:");
         w.WriteLine("  Cr3BurstExtractor.Cli <input.cr3> [output-dir]");
         w.WriteLine("  Cr3BurstExtractor.Cli --count-only <input.cr3>");
+        w.WriteLine("  Cr3BurstExtractor.Cli --get-scan-folder");
+        w.WriteLine("  Cr3BurstExtractor.Cli --set-scan-folder <path>");
         w.WriteLine();
         w.WriteLine("If output-dir is omitted, frames are written next to the input file.");
-        w.WriteLine("On success the final stdout line is 'EXTRACTED <n>' (or 'FRAMES <n>' for --count-only).");
+        w.WriteLine();
+        w.WriteLine("Exit codes:");
+        w.WriteLine("  0  EXTRACTED <n>     burst extracted, n frames written");
+        w.WriteLine("  2  SKIPPED ...       single-frame CR3 (cached or just classified) — nothing written");
+        w.WriteLine("  1  generic error;  64 usage error;  66 input not found");
     }
 }

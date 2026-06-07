@@ -9,7 +9,7 @@ namespace Cr3BurstExtractor;
 /// All IO is best-effort — failures are swallowed so a broken settings folder never blocks the app.
 /// Call <see cref="Save"/> explicitly to write changes to disk.
 /// </summary>
-internal static class UserSettings
+public static class UserSettings
 {
     static string SettingsDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

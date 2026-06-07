@@ -23,17 +23,23 @@ This publishes the CLI as a self-contained single-file exe and drops it into
 
 ## Use
 
-1. Select one or more burst `.CR3` photos in the Library module.
-2. **Library → Plug-in Extras → Extract Burst Frames**.
-3. A progress dialog runs through the selection. Extracted frames are written
-   to the same folder as each source CR3, then imported into the catalog and
-   stacked under the source.
-4. A summary dialog reports how many bursts and frames were processed.
+Burst CR3s are not supported by Lightroom, so they typically aren't in your
+catalog at all — the plugin operates on the **filesystem**, not the catalog,
+matching how the standalone WinForms tool works.
 
-Non-CR3 photos and single-frame CR3s in the selection are skipped (a
-single-frame CR3 is not a burst, so the CLI writes one `_01.CR3` file but the
-plugin leaves it on disk without importing — the source is already in the
-catalog).
+1. **File → Plug-in Extras → Extract Burst Frames…**
+   (in Swedish: **Arkiv → Plugin-tillbehör → Extract Burst Frames…**).
+2. A folder picker opens, pre-populated with the last folder used by either
+   the plugin or the WinForms tool (they share `%APPDATA%\Cr3BurstExtractor\settings.json`).
+   Pick a folder containing burst `.CR3` files.
+3. The plugin recursively scans the folder, runs the CLI on every `.CR3`
+   found, and shows a progress dialog (cancelable).
+4. Extracted frames are written next to each source burst, then imported
+   into Lightroom and stacked together (first frame on top).
+5. A summary dialog reports how many bursts and frames were processed.
+
+Single-frame CR3s are skipped cheaply via the cache (shared with the WinForms
+tool), so re-scanning a folder is fast and doesn't produce duplicate output.
 
 ## Notes
 

@@ -16,7 +16,7 @@ namespace Cr3BurstExtractor;
 ///
 /// All IO is best-effort: cache failures never block the scan.
 /// </summary>
-internal static class NonBurstCache
+public static class NonBurstCache
 {
     static string CacheDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
