@@ -20,6 +20,7 @@ Most of the details here are derived from:
 | 4 | [04-sample-tables.md](04-sample-tables.md) | How `stbl` and its children (`stsz`, `stsc`, `stts`, `co64`/`stco`) describe per-track samples and reference `mdat` |
 | 5 | [05-previews-and-metadata.md](05-previews-and-metadata.md) | THMB, PRVW, EXIF IFD1 thumbnail; CMT1/CMT2/CMT3/CMT4 metadata boxes; what each holds and where they live |
 | 6 | [06-extraction-and-dpp-parity.md](06-extraction-and-dpp-parity.md) | How our extractor builds a single-frame CR3, and where it currently differs from Canon DPP output |
+| 7 | [07-spec-conformance.md](07-spec-conformance.md) | Point-by-point conformance check against the [lclevy/canon_cr3](https://github.com/lclevy/canon_cr3) reference specification |
 
 ## TL;DR — the format in 60 seconds
 

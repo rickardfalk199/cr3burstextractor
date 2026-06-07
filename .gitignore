@@ -47,3 +47,6 @@ desktop.ini
 # Ignore heavy raw test images
 *.CR3
 *.cr3
+
+# Lightroom plugin release zips (built locally by build-plugin.ps1)
+LightroomPlugin/*.zip
