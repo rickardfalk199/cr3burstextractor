@@ -46,18 +46,23 @@ catalog).
 
 ## Cutting a release
 
-1. Bump the `VERSION` block in
-   `Cr3BurstExtractor.lrplugin/Info.lua` (e.g. `revision = 1`).
+The product version lives in **`Cr3BurstExtractor/AppInfo.cs`** (`Version`
+constant) and is the single source of truth — `build-plugin.ps1` patches
+`Info.lua`'s VERSION block from it so the .exe and the Lightroom Plug-in
+Manager always agree.
+
+1. Bump `Version = "..."` in `Cr3BurstExtractor/AppInfo.cs` (e.g. `"0.4"` or
+   `"0.3.1"` — `major.minor[.revision[.build]]`).
 2. Commit the bump.
-3. Tag the commit with `vX.Y.Z` matching the new version and push:
+3. Tag the commit with `vX.Y.Z` matching `AppInfo.Version` exactly and push:
    ```
-   git tag v1.0.1
-   git push origin v1.0.1
+   git tag v0.4
+   git push origin v0.4
    ```
 4. The `Release Lightroom plugin` GitHub Actions workflow builds the zip on a
    Windows runner and publishes it as a GitHub Release with auto-generated
    notes. Users download the zip from the Releases page and follow the
    **Install** steps above.
 
-The workflow refuses to publish if the tag and `Info.lua` version disagree,
-so bump `Info.lua` before tagging.
+The workflow refuses to publish if the tag and `AppInfo.Version` disagree,
+so bump `AppInfo.cs` before tagging.

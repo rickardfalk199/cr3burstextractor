@@ -49,14 +49,38 @@ if (-not (Test-Path $exe)) {
     throw "Expected exe not found after publish: $exe"
 }
 
-# Read version from Info.lua so the zip filename always matches what Lightroom
-# shows in Plug-in Manager.
-$infoLua = Join-Path $pluginDir 'Cr3BurstExtractor.lrplugin\Info.lua'
-$infoContent = Get-Content -Raw $infoLua
-if ($infoContent -notmatch 'VERSION\s*=\s*\{\s*major\s*=\s*(\d+)\s*,\s*minor\s*=\s*(\d+)\s*,\s*revision\s*=\s*(\d+)') {
-    throw "Could not parse VERSION block from $infoLua"
+# AppInfo.cs is the single source of truth for the product version. Read it,
+# parse to major/minor/revision/build, and patch Info.lua's VERSION block so
+# Lightroom Plug-in Manager shows the same version the .exe reports.
+$appInfo = Join-Path $repoRoot 'Cr3BurstExtractor\AppInfo.cs'
+$appInfoContent = Get-Content -Raw $appInfo
+if ($appInfoContent -notmatch 'Version\s*=\s*"([^"]+)"') {
+    throw "Could not find Version constant in $appInfo"
 }
-$version = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
+$version = $Matches[1]
+if ($version -notmatch '^(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?$') {
+    throw "AppInfo.Version '$version' is not in major.minor[.revision[.build]] format"
+}
+$major    = [int]$Matches[1]
+$minor    = [int]$Matches[2]
+$revision = if ($Matches[3]) { [int]$Matches[3] } else { 0 }
+$build    = if ($Matches[4]) { [int]$Matches[4] } else { 0 }
+
+# Rewrite Info.lua's VERSION block in place (UTF-8, no BOM — Lightroom's Lua
+# parser is happiest with that).
+$infoLua = Join-Path $pluginDir 'Cr3BurstExtractor.lrplugin\Info.lua'
+$infoContent = [System.IO.File]::ReadAllText($infoLua)
+$newVersionBlock = "VERSION = { major = $major, minor = $minor, revision = $revision, build = $build }"
+$updatedContent = [regex]::Replace($infoContent, 'VERSION\s*=\s*\{[^}]*\}', $newVersionBlock)
+if ($updatedContent -eq $infoContent -and $infoContent -notmatch [regex]::Escape($newVersionBlock)) {
+    throw "Could not find VERSION block to patch in $infoLua"
+}
+if ($updatedContent -ne $infoContent) {
+    [System.IO.File]::WriteAllText($infoLua, $updatedContent, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "Patched Info.lua VERSION -> { $major, $minor, $revision, $build }"
+} else {
+    Write-Host "Info.lua VERSION already in sync with AppInfo.cs (v$version)"
+}
 
 $pluginFolder = Join-Path $pluginDir 'Cr3BurstExtractor.lrplugin'
 $zipPath = Join-Path $pluginDir "Cr3BurstExtractor.lrplugin-v$version.zip"
