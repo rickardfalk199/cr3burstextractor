@@ -48,5 +48,7 @@ desktop.ini
 *.CR3
 *.cr3
 
-# Lightroom plugin release zips (built locally by build-plugin.ps1)
+# Lightroom plugin release artifacts (built locally by build-plugin.ps1)
 LightroomPlugin/*.zip
+LightroomPlugin/*.exe
+LightroomPlugin/publish-app/

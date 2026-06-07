@@ -1,6 +1,10 @@
 #requires -Version 5.1
-# Publishes the CLI as a self-contained single-file exe and drops it into the
-# plugin's bin/ folder so the .lrplugin is ready to be loaded by Lightroom.
+# Builds the full release set:
+#   1. CLI exe, embedded inside the .lrplugin bundle so Lightroom can find it.
+#   2. Zipped .lrplugin folder for distribution.
+#   3. Standalone WinForms app exe, matching the Rider "Publish to folder"
+#      run config (self-contained, single-file, win-x64).
+# All published artifacts are versioned from Cr3BurstExtractor/AppInfo.cs.
 
 [CmdletBinding()]
 param(
@@ -10,14 +14,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$pluginDir   = $PSScriptRoot
-$repoRoot    = Split-Path -Parent $pluginDir
-$cliProject  = Join-Path $repoRoot 'Cr3BurstExtractor.Cli\Cr3BurstExtractor.Cli.csproj'
-$publishDir  = Join-Path $pluginDir 'publish'
-$pluginBin   = Join-Path $pluginDir 'Cr3BurstExtractor.lrplugin\bin'
+$pluginDir      = $PSScriptRoot
+$repoRoot       = Split-Path -Parent $pluginDir
+$cliProject     = Join-Path $repoRoot 'Cr3BurstExtractor.Cli\Cr3BurstExtractor.Cli.csproj'
+$appProject     = Join-Path $repoRoot 'Cr3BurstExtractor\Cr3BurstExtractor.csproj'
+$publishDir     = Join-Path $pluginDir 'publish'
+$appPublishDir  = Join-Path $pluginDir 'publish-app'
+$pluginBin      = Join-Path $pluginDir 'Cr3BurstExtractor.lrplugin\bin'
 
 if (-not (Test-Path $cliProject)) {
     throw "CLI project not found at $cliProject"
+}
+if (-not (Test-Path $appProject)) {
+    throw "WinForms project not found at $appProject"
 }
 
 if (Test-Path $publishDir) {
@@ -89,10 +98,34 @@ if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 Write-Host "Zipping plugin -> $zipPath"
 Compress-Archive -Path $pluginFolder -DestinationPath $zipPath -CompressionLevel Optimal
 
+# Standalone WinForms app — same flags as the Rider "Publish to folder" run
+# config (.run/Publish Cr3BurstExtractor to folder.run.xml).
 Write-Host ""
-Write-Host "Plugin built successfully (v$version)."
-Write-Host "  Plugin folder: $pluginFolder"
-Write-Host "  Release zip:   $zipPath"
+Write-Host "Publishing standalone app $appProject ($Configuration, $Runtime, self-contained, single-file)..."
+if (Test-Path $appPublishDir) {
+    Remove-Item -Recurse -Force $appPublishDir
+}
+& dotnet publish $appProject `
+    -c $Configuration `
+    -r $Runtime `
+    --self-contained true `
+    -p:PublishSingleFile=true `
+    -o $appPublishDir
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish for WinForms app failed (exit $LASTEXITCODE)" }
+
+$standaloneSrc = Join-Path $appPublishDir 'Cr3BurstExtractor.exe'
+if (-not (Test-Path $standaloneSrc)) {
+    throw "Expected standalone exe not found at $standaloneSrc"
+}
+$standaloneDst = Join-Path $pluginDir "Cr3BurstExtractor-v$version.exe"
+if (Test-Path $standaloneDst) { Remove-Item -Force $standaloneDst }
+Copy-Item -Path $standaloneSrc -Destination $standaloneDst
+
+Write-Host ""
+Write-Host "Release built successfully (v$version)."
+Write-Host "  Plugin folder:  $pluginFolder"
+Write-Host "  Plugin zip:     $zipPath"
+Write-Host "  Standalone app: $standaloneDst"
 Write-Host ""
 Write-Host "In Lightroom Classic:"
 Write-Host "  File -> Plug-in Manager -> Add -> select the Cr3BurstExtractor.lrplugin folder"
