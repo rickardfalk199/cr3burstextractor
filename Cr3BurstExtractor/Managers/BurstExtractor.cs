@@ -103,6 +103,11 @@ public static class BurstExtractor
                 origMdatBoxOffset,
                 frameIdx);
             File.WriteAllBytes(outPath, cr3);
+
+            // We just wrote a single-frame CR3 — pre-seed the non-burst cache so
+            // the next scan doesn't have to open and parse it.
+            NonBurstCache.MarkNonBurst(outPath, new FileInfo(outPath));
+
             Console.WriteLine($"  [{frameIdx + 1}/{frameCount}] {outName}  ({cr3.Length:N0} bytes)");
             written++;
         }

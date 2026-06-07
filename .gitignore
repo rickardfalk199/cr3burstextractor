@@ -43,3 +43,7 @@ desktop.ini
 
 # Logs
 *.log
+
+# Ignore heavy raw test images
+*.CR3
+*.cr3

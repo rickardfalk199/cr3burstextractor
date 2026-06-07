@@ -34,7 +34,7 @@ public sealed class MainForm : Form
     const int ExtractButtonW = 130;
     const int ExtractButtonH = 38;
     const int ProgressBarH   = 22;
-    const int ProgressLabelW = 90;
+    const int ProgressLabelW = 150; // wide enough for "999999 / 999999" (6-digit totals)
 
     // ---- controls ---------------------------------------------------------
     readonly TextBox _scanDirBox;

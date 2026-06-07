@@ -20,6 +20,7 @@ public static class MoovBuilder
         Box moovBox,
         List<(byte[] Data, int TrakIdx)> frameSamples,
         int frameIdx,
+        byte[]? frameJpeg,
         out long moovSize)
     {
         using var ms = new MemoryStream();
@@ -78,9 +79,17 @@ public static class MoovBuilder
                 // Patch movie duration down to a single frame
                 content.Write(BoxPatcher.PatchDuration(BoxQuery.GetRawBox(src, child), DurField.Mvhd, movieDur));
             }
+            else if (child.Type == "uuid" && frameJpeg != null)
+            {
+                // Canon CR3 wraps CMT1/CMT2/CMT3/CMT4/THMB/CNCV/CCTP/CTBO/CNOP
+                // inside this uuid. We need to rewrite the inner THMB box per-frame
+                // (otherwise every extracted CR3 inherits frame 0's thumbnail and
+                // Lightroom shows identical previews across the whole burst).
+                content.Write(RebuildMoovUuidWrapperWithPerFrameThmb(src, child, frameJpeg));
+            }
             else
             {
-                // Copy the box verbatim (CMT1, CMT2, CMT3, CMT4, THMB, CNCV, uuid, etc.)
+                // Copy the box verbatim (CMT1, CMT2, CMT3, CMT4, CNCV, uuid w/o JPEG, etc.)
                 content.Write(BoxQuery.GetRawBox(src, child));
             }
         }
@@ -93,6 +102,37 @@ public static class MoovBuilder
         ms.Write(contentBytes);
 
         return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Rebuilds the Canon moov-level uuid wrapper, swapping its THMB child for
+    /// a per-frame version. All other children (CMT1..CMT4, CNCV, CCTP, CTBO,
+    /// CNOP, free) are copied verbatim.
+    /// </summary>
+    static byte[] RebuildMoovUuidWrapperWithPerFrameThmb(byte[] src, Box uuidBox, byte[] frameJpeg)
+    {
+        // moov.uuid = 8-byte box header + 16-byte UUID + nested boxes.
+        int innerStart = uuidBox.RawOffset + 8 + 16;
+        int innerEnd   = uuidBox.RawOffset + uuidBox.RawSize;
+        var innerChildren = BoxParser.ParseLevel(src, innerStart, innerEnd);
+
+        using var innerStream = new MemoryStream();
+        foreach (var child in innerChildren)
+        {
+            if (child.Type == "THMB")
+                innerStream.Write(ThmbBuilder.BuildWithJpeg(BoxQuery.GetRawBox(src, child), frameJpeg));
+            else
+                innerStream.Write(BoxQuery.GetRawBox(src, child));
+        }
+        byte[] innerBytes = innerStream.ToArray();
+        long outerSize = 8 + 16 + innerBytes.Length;
+
+        using var outer = new MemoryStream();
+        BinaryHelpers.WriteUInt32BE(outer, (uint)outerSize);
+        outer.Write(Encoding.ASCII.GetBytes("uuid"));
+        outer.Write(src, uuidBox.RawOffset + 8, 16); // preserve the 16-byte UUID identifier
+        outer.Write(innerBytes);
+        return outer.ToArray();
     }
 
     // ----------------------------------------------------------

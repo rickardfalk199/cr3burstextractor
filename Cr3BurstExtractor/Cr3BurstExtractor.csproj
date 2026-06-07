@@ -6,6 +6,9 @@
         <UseWindowsForms>true</UseWindowsForms>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <!-- Generate app.ico once by running the .exe with the generate-icon flag.
+             The Condition keeps the build green before that file is generated. -->
+        <ApplicationIcon Condition="Exists('app.ico')">app.ico</ApplicationIcon>
     </PropertyGroup>
 
 </Project>
