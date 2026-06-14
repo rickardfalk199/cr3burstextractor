@@ -11,7 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Cr3BurstExtractor\Cr3BurstExtractor.csproj" />
+        <ProjectReference Include="..\Cr3BurstExtractor.Lib\Cr3BurstExtractor.Lib.csproj" />
     </ItemGroup>
 
 </Project>

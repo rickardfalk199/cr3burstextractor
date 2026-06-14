@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Text.Json;
 
 namespace Cr3BurstExtractor;
@@ -14,37 +11,46 @@ namespace Cr3BurstExtractor;
 /// (UTC ticks) so we can detect if a file has changed since the last check — a changed
 /// file is treated as a cache miss and re-inspected from scratch.
 ///
+/// Stored in <c>%ProgramData%\Cr3BurstExtractor\non_burst_cache.json</c> so the
+/// interactive tool and the Windows Service share the same cache; see
+/// <see cref="SharedPaths"/>. Writes are atomic (tmp + rename) so concurrent
+/// writers from both processes don't tear the file.
+///
 /// All IO is best-effort: cache failures never block the scan.
 /// </summary>
 public static class NonBurstCache
 {
-    static string CacheDir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Cr3BurstExtractor");
-
-    static string CacheFile => Path.Combine(CacheDir, "non_burst_cache.json");
-
     sealed class Entry
     {
         public long Size { get; set; }
         public long Mtime { get; set; }
     }
 
-    static readonly Dictionary<string, Entry> _entries = Load();
+    static Dictionary<string, Entry> _entries = Load();
 
     static Dictionary<string, Entry> Load()
     {
         try
         {
-            if (File.Exists(CacheFile))
+            SharedPaths.MigrateLegacyIfNeeded("non_burst_cache.json");
+
+            if (File.Exists(SharedPaths.CacheFile))
             {
-                var dict = JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(CacheFile));
+                var dict = JsonSerializer.Deserialize<Dictionary<string, Entry>>(
+                    File.ReadAllText(SharedPaths.CacheFile));
                 if (dict != null) return new Dictionary<string, Entry>(dict, StringComparer.OrdinalIgnoreCase);
             }
         }
         catch { /* corrupt cache file — start fresh */ }
         return new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Re-reads the cache from disk and replaces the in-memory snapshot.
+    /// The service calls this before each per-file run so writes the form
+    /// just made are visible (and vice versa).
+    /// </summary>
+    public static void Reload() => _entries = Load();
 
     /// <summary>
     /// Returns true if <paramref name="path"/> is in the cache AND its size + mtime
@@ -70,10 +76,9 @@ public static class NonBurstCache
     {
         try
         {
-            Directory.CreateDirectory(CacheDir);
-            File.WriteAllText(
-                CacheFile,
-                JsonSerializer.Serialize(_entries, new JsonSerializerOptions { WriteIndented = false }));
+            SharedPaths.EnsureDir();
+            string json = JsonSerializer.Serialize(_entries, new JsonSerializerOptions { WriteIndented = false });
+            SharedPaths.AtomicWriteAllText(SharedPaths.CacheFile, json);
         }
         catch { /* best-effort */ }
     }

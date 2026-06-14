@@ -317,6 +317,9 @@ public sealed class MainForm : Form
             ShortcutKeys = Keys.Alt | Keys.F4
         });
 
+        var settingsMenu = BuildSettingsMenu();
+        var serviceMenu  = BuildServiceMenu();
+
         var helpMenu = new ToolStripMenuItem("&Help");
         helpMenu.DropDownItems.Add(new ToolStripMenuItem("&Help", null, (_, _) =>
         {
@@ -332,8 +335,103 @@ public sealed class MainForm : Form
         }));
 
         menu.Items.Add(fileMenu);
+        menu.Items.Add(settingsMenu);
+        menu.Items.Add(serviceMenu);
         menu.Items.Add(helpMenu);
         return menu;
+    }
+
+    ToolStripMenuItem BuildSettingsMenu()
+    {
+        var settingsMenu = new ToolStripMenuItem("&Settings");
+
+        var autoExtract = new ToolStripMenuItem("&Auto-extract new files in scan folder")
+        {
+            CheckOnClick = true,
+            Checked = UserSettings.AutoExtractOnNewFiles,
+            ToolTipText = "When enabled, the background service watches the scan folder " +
+                          "and extracts new burst CR3s automatically. Requires the service " +
+                          "to be installed and running (see the Service menu).",
+        };
+        autoExtract.CheckedChanged += (_, _) =>
+        {
+            UserSettings.AutoExtractOnNewFiles = autoExtract.Checked;
+            UserSettings.Save();
+
+            if (!autoExtract.Checked) return;
+            var state = ServiceStatus.QueryState();
+            if (state == ServiceState.NotInstalled)
+            {
+                MessageBox.Show(this,
+                    "Auto-extract is on, but the background service isn't installed yet.\n\n" +
+                    "Use Service → Install service to install it, then Start service.",
+                    "Service not installed",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else if (state == ServiceState.Stopped)
+            {
+                MessageBox.Show(this,
+                    "Auto-extract is on, but the background service isn't running.\n\n" +
+                    "Use Service → Start service to start it.",
+                    "Service not running",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        };
+        settingsMenu.DropDownItems.Add(autoExtract);
+        return settingsMenu;
+    }
+
+    ToolStripMenuItem BuildServiceMenu()
+    {
+        var serviceMenu = new ToolStripMenuItem("Ser&vice");
+
+        var install   = new ToolStripMenuItem("&Install service…",   null, (_, _) => RunSelfElevated("--install"));
+        var uninstall = new ToolStripMenuItem("&Uninstall service…", null, (_, _) => RunSelfElevated("--uninstall"));
+        var start     = new ToolStripMenuItem("&Start service",           null, (_, _) => RunSelfElevated("--start"));
+        var stop      = new ToolStripMenuItem("S&top service",            null, (_, _) => RunSelfElevated("--stop"));
+
+        serviceMenu.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            install, uninstall, new ToolStripSeparator(), start, stop,
+        });
+
+        serviceMenu.DropDownOpening += (_, _) =>
+        {
+            var state = ServiceStatus.QueryState();
+            bool installed = state != ServiceState.NotInstalled;
+            install.Enabled   = !installed;
+            uninstall.Enabled = installed;
+            start.Enabled     = installed && state != ServiceState.Running && state != ServiceState.StartPending;
+            stop.Enabled      = installed && state != ServiceState.Stopped && state != ServiceState.StopPending;
+        };
+
+        return serviceMenu;
+    }
+
+    void RunSelfElevated(string subcommand)
+    {
+        try
+        {
+            string exe = Environment.ProcessPath
+                ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
+                ?? throw new InvalidOperationException("Cannot determine executable path.");
+            var psi = new System.Diagnostics.ProcessStartInfo(exe, subcommand)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+            };
+            using var p = System.Diagnostics.Process.Start(psi);
+            p?.WaitForExit();
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // User cancelled UAC — leave state as-is.
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Failed to run {subcommand}: {ex.Message}",
+                "Service command failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     sealed class AccentMenuColors : ProfessionalColorTable
@@ -475,54 +573,24 @@ public sealed class MainForm : Form
             }
             try
             {
-                var info = new FileInfo(file);
-                if (NonBurstCache.IsKnownNonBurst(file, info))
+                var result = AutoExtractor.ProcessFile(file, moveOriginals, backupDir, Console.WriteLine);
+                switch (result.Outcome)
                 {
-                    // Previously confirmed single-frame — skip silently to keep the
-                    // log readable. Still counts toward progress.
-                    cached++;
-                    continue;
+                    case AutoExtractOutcome.Cached:
+                        cached++;
+                        break;
+                    case AutoExtractOutcome.SkippedNonBurst:
+                        skipped++;
+                        break;
+                    case AutoExtractOutcome.Extracted:
+                        burstsFound++;
+                        framesExtracted += result.FrameCount;
+                        extracted++;
+                        break;
+                    case AutoExtractOutcome.Error:
+                        errors++;
+                        break;
                 }
-
-                int frames = BurstExtractor.GetFrameCount(file);
-                if (frames <= 1)
-                {
-                    Console.WriteLine($"SKIP ({frames} frame): {file}");
-                    NonBurstCache.MarkNonBurst(file, info);
-                    skipped++;
-                    continue;
-                }
-
-                string parent = Path.GetDirectoryName(Path.GetFullPath(file))!;
-                string outDir = Path.Combine(parent, Path.GetFileNameWithoutExtension(file));
-
-                Console.WriteLine($"BURST ({frames} frames): {file}");
-                Console.WriteLine($"  -> {outDir}");
-
-                burstsFound++;
-                progress.Report((processed, total, burstsFound, framesExtracted));
-
-                int written = BurstExtractor.Extract(file, outDir);
-                framesExtracted += written;
-
-                if (moveOriginals)
-                {
-                    string destBackup = UniquePath(Path.Combine(backupDir, Path.GetFileName(file)));
-                    File.Move(file, destBackup);
-                    Console.WriteLine($"  moved original -> {destBackup}");
-                }
-                else
-                {
-                    Console.WriteLine($"  original left in place: {file}");
-                }
-                Console.WriteLine();
-
-                extracted++;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"ERROR processing {file}: {ex.Message}");
-                errors++;
             }
             finally
             {
@@ -530,8 +598,6 @@ public sealed class MainForm : Form
                 progress.Report((processed, total, burstsFound, framesExtracted));
             }
         }
-
-        NonBurstCache.Save();
 
         Console.WriteLine();
         Console.WriteLine($"Summary: {extracted} burst(s) extracted, " +
@@ -544,19 +610,6 @@ public sealed class MainForm : Form
         string fullFile = Path.GetFullPath(filePath);
         return fullFile.StartsWith(fullDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             || fullFile.StartsWith(fullDir + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    }
-
-    static string UniquePath(string path)
-    {
-        if (!File.Exists(path)) return path;
-        string dir = Path.GetDirectoryName(path)!;
-        string name = Path.GetFileNameWithoutExtension(path);
-        string ext = Path.GetExtension(path);
-        for (int i = 1; ; i++)
-        {
-            string candidate = Path.Combine(dir, $"{name}_{i}{ext}");
-            if (!File.Exists(candidate)) return candidate;
-        }
     }
 
     void SetBusy(bool busy)

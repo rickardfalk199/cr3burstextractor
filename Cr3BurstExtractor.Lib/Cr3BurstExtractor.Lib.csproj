@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>Cr3BurstExtractor</RootNamespace>
+        <AssemblyName>Cr3BurstExtractor.Lib</AssemblyName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- ThmbBuilder uses System.Drawing for the per-frame THMB thumbnail
+             resize. System.Drawing.Common is Windows-only; the TFM above
+             reflects that. -->
+        <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+    </ItemGroup>
+
+</Project>

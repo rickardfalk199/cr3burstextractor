@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cr3BurstExtractor.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cr3BurstExtractor.Cli", "Cr3BurstExtractor.Cli\Cr3BurstExtractor.Cli.csproj", "{03936CAD-D78B-4B2D-A2FE-CF24D8104A48}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cr3BurstExtractor.Lib", "Cr3BurstExtractor.Lib\Cr3BurstExtractor.Lib.csproj", "{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,18 @@ Global
 		{03936CAD-D78B-4B2D-A2FE-CF24D8104A48}.Release|x64.Build.0 = Release|Any CPU
 		{03936CAD-D78B-4B2D-A2FE-CF24D8104A48}.Release|x86.ActiveCfg = Release|Any CPU
 		{03936CAD-D78B-4B2D-A2FE-CF24D8104A48}.Release|x86.Build.0 = Release|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Debug|x64.Build.0 = Debug|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Debug|x86.Build.0 = Debug|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Release|x64.ActiveCfg = Release|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Release|x64.Build.0 = Release|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Release|x86.ActiveCfg = Release|Any CPU
+		{66AD4F0C-E2F1-4257-90F9-48D25D7DE748}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
