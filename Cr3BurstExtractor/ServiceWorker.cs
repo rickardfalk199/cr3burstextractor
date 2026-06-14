@@ -79,9 +79,10 @@ public sealed class ServiceWorker : BackgroundService
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
                 EnableRaisingEvents = true,
             };
-            _settingsWatcher.Changed += (_, _) => DebounceSettingsReload();
+            _settingsWatcher.Changed += (_, e) => { _logger.LogDebug("settings.json {Change}", e.ChangeType); DebounceSettingsReload(); };
             _settingsWatcher.Created += (_, _) => DebounceSettingsReload();
             _settingsWatcher.Renamed += (_, _) => DebounceSettingsReload();
+            _logger.LogInformation("Watching {Path} for settings changes.", SharedPaths.SettingsFile);
         }
         catch (Exception ex)
         {
@@ -114,6 +115,9 @@ public sealed class ServiceWorker : BackgroundService
     {
         string? scanFolder = UserSettings.ScanFolder;
         bool autoExtract = UserSettings.AutoExtractOnNewFiles;
+
+        _logger.LogInformation("Rebind: AutoExtractOnNewFiles={Auto}, ScanFolder={Folder}, MoveOriginals={Move}, BackupFolder={Backup}",
+            autoExtract, scanFolder ?? "<unset>", UserSettings.MoveOriginalsToBackup, UserSettings.BackupFolder ?? "<unset>");
 
         if (string.Equals(scanFolder, _activeScanFolder, StringComparison.OrdinalIgnoreCase)
             && autoExtract == _activeAutoExtract
@@ -156,8 +160,16 @@ public sealed class ServiceWorker : BackgroundService
                 InternalBufferSize = 65536,
                 EnableRaisingEvents = true,
             };
-            _scanWatcher.Created += (_, e) => Enqueue(e.FullPath);
-            _scanWatcher.Renamed += (_, e) => Enqueue(e.FullPath);
+            _scanWatcher.Created += (_, e) =>
+            {
+                _logger.LogInformation("Watcher.Created {Path}", e.FullPath);
+                Enqueue(e.FullPath);
+            };
+            _scanWatcher.Renamed += (_, e) =>
+            {
+                _logger.LogInformation("Watcher.Renamed {Old} -> {New}", e.OldFullPath, e.FullPath);
+                Enqueue(e.FullPath);
+            };
             _scanWatcher.Error += (_, e) =>
             {
                 _logger.LogWarning(e.GetException(), "Watcher error; re-enumerating scan folder.");
@@ -229,7 +241,12 @@ public sealed class ServiceWorker : BackgroundService
     {
         try
         {
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path))
+            {
+                _logger.LogDebug("Skipping {Path}: no longer exists.", path);
+                return;
+            }
+            _logger.LogInformation("Processing {Path}", path);
 
             if (!await WaitForFileReadyAsync(path, stoppingToken))
             {
@@ -253,6 +270,8 @@ public sealed class ServiceWorker : BackgroundService
             {
                 case AutoExtractOutcome.Extracted:
                     _logger.LogInformation("Extracted {Count} frame(s) from {Path}.", result.FrameCount, path);
+                    if (UserSettings.ShowNotifications)
+                        TryShowNotification(path, result.FrameCount);
                     break;
                 case AutoExtractOutcome.SkippedNonBurst:
                     _logger.LogInformation("Marked {Path} as non-burst (single frame).", path);
@@ -269,6 +288,32 @@ public sealed class ServiceWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error processing {Path}.", path);
+        }
+    }
+
+    void TryShowNotification(string sourcePath, int frameCount)
+    {
+        try
+        {
+            string? exe = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exe))
+            {
+                _logger.LogWarning("Skipping notification: cannot determine own exe path.");
+                return;
+            }
+
+            string fileName = Path.GetFileName(sourcePath);
+            // Quote-escape the message so spaces don't split argv. The receiver
+            // uses Environment.GetCommandLineArgs which respects quotes.
+            string message = $"Extracted {frameCount} frames from {fileName}";
+            string args = $"--notify \"{message.Replace("\"", "'")}\"";
+
+            if (!SessionLauncher.LaunchInActiveSession(exe, args, out var err))
+                _logger.LogInformation("Notification skipped: {Reason}", err);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fire notification for {Path}.", sourcePath);
         }
     }
 

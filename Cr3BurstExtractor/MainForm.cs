@@ -378,6 +378,22 @@ public sealed class MainForm : Form
             }
         };
         settingsMenu.DropDownItems.Add(autoExtract);
+
+        var showNotifications = new ToolStripMenuItem("Show Windows &notification on auto-extract")
+        {
+            CheckOnClick = true,
+            Checked = UserSettings.ShowNotifications,
+            ToolTipText = "When the service auto-extracts a burst, pop a Windows toast " +
+                          "(\"Extracted N frames from xyz.CR3\"). Turn off if the toasts " +
+                          "are noisy during a long camera offload.",
+        };
+        showNotifications.CheckedChanged += (_, _) =>
+        {
+            UserSettings.ShowNotifications = showNotifications.Checked;
+            UserSettings.Save();
+        };
+        settingsMenu.DropDownItems.Add(showNotifications);
+
         return settingsMenu;
     }
 

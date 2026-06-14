@@ -87,6 +87,54 @@ public sealed class HelpForm : Form
             "Only one frame: skipped — not a burst — the file is left untouched.",
             "Unreadable or invalid: logged as an error; the scan continues with the next file.");
 
+        AddSection(
+            content,
+            textWidth,
+            "Background service (auto-extract)",
+            "The same executable can also run as a Windows Service that watches the Scan folder and " +
+            "auto-extracts new bursts as they appear — e.g. straight off a card reader or camera " +
+            "offload. The service applies the same per-file logic as the Extract button: cache check, " +
+            "frame count, extract (or mark as single-frame), and optional move to the Backup folder.");
+
+        AddBullets(
+            content,
+            textWidth,
+            "Setting it up",
+            "Set the Scan folder (and Backup folder, if you want originals moved).",
+            "Service → Install service…  (prompts for UAC).",
+            "Settings → Auto-extract new files in scan folder  — tick it.",
+            "Service → Start service.");
+
+        AddSection(
+            content,
+            textWidth,
+            null,
+            "The service runs as LocalSystem and starts automatically with Windows. " +
+            "Toggling the auto-extract setting takes effect immediately — no service restart needed. " +
+            "Use Service → Stop / Start / Uninstall to manage it from the form, or " +
+            "Cr3BurstExtractor.exe --install / --start / --stop / --status / --uninstall from a terminal.");
+
+        AddBullets(
+            content,
+            textWidth,
+            "Windows notifications",
+            "When the service successfully extracts a burst, it pops a Windows toast " +
+            "(\"Extracted N frames from xyz.CR3\") in the logged-in user's session.",
+            "Toggle this off via Settings → Show Windows notification on auto-extract if it gets noisy " +
+            "during long camera offloads.",
+            "Toasts only reach the active console session — if nobody is logged in, or only an RDP " +
+            "user is connected, the extraction still happens but the toast is skipped.");
+
+        AddBullets(
+            content,
+            textWidth,
+            "Logs and config",
+            "Settings live in %ProgramData%\\Cr3BurstExtractor\\settings.json (shared between the form, " +
+            "the CLI, and the service).",
+            "Non-burst cache lives in %ProgramData%\\Cr3BurstExtractor\\non_burst_cache.json.",
+            "Service activity is logged to %ProgramData%\\Cr3BurstExtractor\\service.log (rolls at 5 MB) " +
+            "and to the Windows Event Log under source Cr3BurstExtractor.");
+
         AddBullets(
             content,
             textWidth,

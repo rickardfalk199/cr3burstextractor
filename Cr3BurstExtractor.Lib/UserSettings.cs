@@ -34,6 +34,11 @@ public static class UserSettings
         // CR3s as they appear in ScanFolder. The standalone tool works whether
         // this is on or off; the toggle only affects the service.
         public bool AutoExtractOnNewFiles { get; set; }
+
+        // When enabled, the service spawns a tiny user-session helper to show
+        // a Windows notification after each successful auto-extraction.
+        // Default true preserves the most useful behavior for headless use.
+        public bool ShowNotifications { get; set; } = true;
     }
 
     static Data _data = Load();
@@ -112,5 +117,11 @@ public static class UserSettings
     {
         get => _data.AutoExtractOnNewFiles;
         set => _data.AutoExtractOnNewFiles = value;
+    }
+
+    public static bool ShowNotifications
+    {
+        get => _data.ShowNotifications;
+        set => _data.ShowNotifications = value;
     }
 }

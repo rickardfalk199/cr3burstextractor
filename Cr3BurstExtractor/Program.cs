@@ -34,6 +34,11 @@ static class Program
                     RunService(args);
                     return 0;
 
+                case "--notify":
+                    // Spawned by the service via SessionLauncher to pop a
+                    // toast in the user's session. No UI other than the toast.
+                    return Notifier.Run(args.Length > 1 ? args[1] : string.Empty);
+
                 case "--install":   return ServiceCommands.Install();
                 case "--uninstall": return ServiceCommands.Uninstall();
                 case "--start":     return ServiceCommands.Start();
